@@ -35,7 +35,7 @@ int main()
     double REcontact_cable_SUS_fil_circuit = 1.10;
     
     double k_fil=147;//filament thermal conductivity[W/m*K]
-    double e_fil=0.5;//filament emissisvity
+    double e_fil=0.3;//filament emissisvity
     double A_fil;//filament Emissive surface area[m^2]
     double S_fil;//filament cross section area[m^2]
     double d_fil=0.125e-3;//filament diameter[m]
@@ -45,7 +45,7 @@ int main()
     double workfunction_fil = 5.0e-19;//[J] 2.0eV for Y2O3
     
     double k_SUS=16.7;//SUS304 thermal conductivity[W/m*K]
-    double e_SUS=0.4;//SUS304 emissisvity
+    double e_SUS=0.3;//SUS304 emissisvity
     double A_SUS;//SUS304 Emissive surface area[m^2]
     double S_SUS;//SUS304 cross section area[m^2]
     double d_SUS = 1.6e-3;//SUS304 diameter [m]
@@ -155,20 +155,20 @@ int main()
         Temperature[i]=300.;
     }
     
-    int roopcount = 0;
-    int ROOPABORT = 20000;
+    int LOOPcount = 0;
+    int LOOPABORT = 20000;
     double TEMPABORT = 3000;
     double CURRENTABORT = 100e-3;
     int displaycount = 1000;
     
     //  Endless loop til convergence
     while(1){
-        roopcount += 1;
+        LOOPcount += 1;
         
         RTcontact_cable_SUS = RTcontact(Temperature[cable_end], Temperature[SUS_ini], alpha_cable, alpha_SUS, k_cable, k_SUS, rho_cable, rho_SUS, REcontact_cable_SUS);
         RTcontact_SUS_fil = RTcontact(Temperature[SUS_end], Temperature[fil_ini], alpha_SUS, alpha_fil, k_SUS, k_fil, rho_SUS, rho_fil, REcontact_SUS_fil);
         
-        if(roopcount % displaycount == 0){
+        if(LOOPcount % displaycount == 0){
             printf("RTcontact_cable_SUS %f\n", RTcontact_cable_SUS);
             printf("RTcontact_SUS_fil %f\n", RTcontact_SUS_fil);
         }
@@ -385,24 +385,24 @@ int main()
             }
         }
         
-        //roop END judge
+        //LOOP END judge
         for(i=0; i<DIM; i++){
             DeltaTemperaturenorm += DeltaTemperature[i] * DeltaTemperature[i];
         }
         
-        if ( roopcount > ROOPABORT ) {
-            printf("roopcount over\n\n");
+        if ( LOOPcount > LOOPABORT ) {
+            printf("LOOPcount over\n\n");
             break;
         }
         
         if ( DeltaTemperaturenorm < Breakvalue ) {
-            printf("ROOP %d: norm %1.2f ,filtop temp %1.2f\n\n", roopcount, DeltaTemperaturenorm, Temperature[DIM-1]);
+            printf("LOOP %d: norm %1.2f ,filtop temp %1.2f\n\n", LOOPcount, DeltaTemperaturenorm, Temperature[DIM-1]);
             printf("Convergence\n\n");
             break;
         }
         else{
-            if(roopcount % displaycount == 0){
-                printf("ROOP %d: norm %1.2f ,filtop temp %1.2f\n\n", roopcount, DeltaTemperaturenorm, Temperature[DIM-1]);
+            if(LOOPcount % displaycount == 0){
+                printf("LOOP %d: norm %1.2f ,filtop temp %1.2f\n\n", LOOPcount, DeltaTemperaturenorm, Temperature[DIM-1]);
             }
             DeltaTemperaturenorm = 0;
             for(i=0; i<DIM; i++){
