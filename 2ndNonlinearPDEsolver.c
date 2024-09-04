@@ -5,19 +5,14 @@
 
 double dz=0.2e-3;//m
 double dt=1.;//s
-double Icur=2.898;//[A]
 double sigma=5.67e-8;//Stefan Boltzmann Constant [W/m2*K4]
-double T0=300;//Ambient temp [K]
-
-int Mode = 2;
-//Mode1 = Static solver
-//Mode2 = Time solver
-
 double RichardsonConstant=1.20e6;// [A/m2*K2]
 double BoltzmannnConstant=1.38e-23;// [J/K]
 
-double functionF(double T, double d, double e, double alpha, double rho, double k);
-double functionforiginal(double T, double d, double e, double alpha, double rho, double k);
+double T0=300;//Ambient temp [K]
+
+double functionF(double T, double d, double e, double alpha, double rho, double k, double Current);
+double functionforiginal(double T, double d, double e, double alpha, double rho, double k, double Current);
 double RTcontact(double TA, double TB, double alphaA, double alphaB, double kA, double kB, double rhoA, double rhoB, double REcontact);
 
 int main()
@@ -33,117 +28,142 @@ int main()
     fp2=fopen("coatingT.dat","w");
     fp3=fopen("Filtop_with_Time.dat","w");
     
+    FILE *readfile;
+    char *readfilename = "./CalcParameter.csv";
+    int ret;
+    char buf[31][40];
+    int Mode;
+    double data[30];
+
+    readfile = fopen( readfilename, "r" );
+    if( readfile == NULL ){
+        printf( "Failed to open Parameter file -%s-\n", readfilename );
+        return -1;
+    }
+    printf("\n");
+
+    fscanf(readfile, "%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%s", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7], buf[8], buf[9], buf[10], buf[11], buf[12], buf[13], buf[14], buf[15], buf[16], buf[17], buf[18], buf[19], buf[20], buf[21], buf[22], buf[23], buf[24], buf[25], buf[26], buf[27], buf[28], buf[29], buf[30]);
+    fscanf(readfile, "%d,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf", &Mode, &data[0], &data[1], &data[2], &data[3], &data[4], &data[5], &data[6], &data[7], &data[8], &data[9], &data[10], &data[11], &data[12], &data[13], &data[14], &data[15], &data[16], &data[17], &data[18], &data[19], &data[20], &data[21], &data[22], &data[23], &data[24], &data[25], &data[26], &data[27], &data[28], &data[29]);
+    
+    printf("%s %d\n",buf[0], Mode);
+    for(int n=1; n<31; n++){
+        printf("%s %1.2e\n",buf[n], data[n-1]);
+    }
+
+    printf("\n");
+    fclose(readfile);
+    
+    
+    double Icur;                Icur = data[0];//[A]
+    double k_fil;               k_fil = data[1];//[W/m*K]
+    double d_fil;               d_fil = data[2];//[m]
+    double e_fil;               e_fil = data[3];//
+    double l_half_fil;               l_half_fil = data[4]/2.;//[m]
+    double rho_fil;             rho_fil = data[5];//[Ohm*m]
+    double alpha_fil;           alpha_fil = data[6];//[Ohm*m/K]
+    double rhoMASS_fil;         rhoMASS_fil = data[7];//[kg/m^3]
+    double SpecificHeat_fil;    SpecificHeat_fil = data[8];//[J/kg*K]
+    double workfunction_fil;    workfunction_fil = data[9];//[J]
+    double coating_thickness;   coating_thickness = data[10];//[m]
+    double coating_half_length; coating_half_length = data[11]/2.;//[m]
+    
+    double k_Pin;               k_Pin = data[12];//[W/m*K]
+    double d_Pin;               d_Pin = data[13];//[m]
+    double e_Pin;               e_Pin = data[14];//
+    double l_Pin;               l_Pin = data[15];//[m]
+    double rho_Pin;             rho_Pin = data[16];//[Ohm*m]
+    double alpha_Pin;           alpha_Pin = data[17];//[Ohm*m/K]
+    double rhoMASS_Pin;         rhoMASS_Pin = data[18];//[kg/m^3]
+    double SpecificHeat_Pin;    SpecificHeat_Pin = data[19];//[J/kg*K]
+    
+    double k_cable;             k_cable = data[20];//[W/m*K]
+    double d_cable;             d_cable = data[21];//[m]
+    double e_cable;             e_cable = data[22];//
+    double l_cable;             l_cable = data[23];//[m]
+    double rho_cable;           rho_cable = data[24];//[Ohm*m]
+    double alpha_cable;         alpha_cable = data[25];//[Ohm*m/K]
+    double rhoMASS_cable;       rhoMASS_cable = data[26];//[kg/m^3]
+    double SpecificHeat_cable;  SpecificHeat_cable = data[27];//[J/kg*K]
+    
+    double A_fil;//filament Emissive surface area[m^2]
+    double S_fil;//filament cross section area[m^2]
+    double A_Pin;//Pin Emissive surface area[m^2]
+    double S_Pin;//Pin cross section area[m^2]
+    double A_cable;//cable Emissive surface area[m^2]
+    double S_cable;//cable Emissive surface area[m^2]
+    A_cable = M_PI * d_cable * dz;
+    A_Pin = M_PI * d_Pin * dz;
+    A_fil = M_PI * d_fil * dz;
+    S_cable = M_PI * (d_cable/2.) * (d_cable/2.);
+    S_Pin = M_PI * (d_Pin/2.) * (d_Pin/2.);
+    S_fil = M_PI * (d_fil/2.) * (d_fil/2.);
+    
+    
+    double REcontact_Pin_fil_circuit;
+    REcontact_Pin_fil_circuit = data[28];
+    double REcontact_cable_Pin_fil_circuit = 1.00;
+    REcontact_cable_Pin_fil_circuit = data[29];
+    
+    double REcontact_Pin_fil;
+    double REcontact_cable_Pin;
+    REcontact_Pin_fil = (REcontact_Pin_fil_circuit - 2.*rho_fil*l_half_fil/S_fil -2.*rho_Pin*l_Pin/S_Pin)/2.;
+    REcontact_cable_Pin = (REcontact_cable_Pin_fil_circuit - REcontact_Pin_fil_circuit -2.*rho_cable*l_cable/S_cable)/2.;
+    printf("REcontact_cable_Pin %f\n", REcontact_cable_Pin);
+    printf("REcontact_Pin_fil %f\n", REcontact_Pin_fil);
+    
     double totalpower=0.;
     double totalcurrent=0.;
     double fil_power=0.;
     double cable_power=0.;
-    double SUS_power=0.;
+    double Pin_power=0.;
     double sumRI2=0.;
-    
     double EmitcalcT=0.;
-    double REcontact_SUS_fil_circuit = 0.30;
-    double REcontact_cable_SUS_fil_circuit = 1.00;
     
-    double k_fil=147;//filament thermal conductivity[W/m*K]
-    double e_fil=0.33;//filament emissisvity
-    double A_fil;//filament Emissive surface area[m^2]
-    double S_fil;//filament cross section area[m^2]
-    double d_fil=0.125e-3;//0.075e-3;//filament diameter[m]
-    double l_fil=4.e-3;//filament half length[m]
-    double alpha_fil = 5.1e-3;//temp coefficient of resistivity [Ohm*m/K]
-    double rho_fil = 5.3e-8;//volume resistivity [Ohm*m]
-    double rhoMASS_fil = 22.5e3;//density [kg/m^3]
-    double SpecificHeat_fil = 130;//Specific Heat [J/kg*K]
-    
-    double workfunction_fil = 4.48e-19;//[J] 2.8eV
-    double coating_thickness = 0.05e-3;
-    double coating_half_length = 2.e-3;
-    
-    double k_SUS=10.7;//SUS304 thermal conductivity[W/m*K]
-    double e_SUS=0.4;//SUS304 emissisvity
-    double A_SUS;//SUS304 Emissive surface area[m^2]
-    double S_SUS;//SUS304 cross section area[m^2]
-    double d_SUS = 1.6e-3;//SUS304 diameter [m]
-    double l_SUS = 10e-3;//SUS304 length[m]
-    double alpha_SUS = 5.0e-3;//temp coefficient of resistivity [Ohm*m/K]
-    double rho_SUS = 74.e-8;//volume resistivity [Ohm*m]
-    double rhoMASS_SUS = 7.93e3;//density [kg/m^3]
-    double SpecificHeat_SUS = 500;//Specific Heat [J/kg*K]
-    
-    double k_cable=65.;//Tinned soft copper wire[W/m*K]
-    double e_cable=0.;//cable emissisvity
-    double A_cable;//cable Emissive surface area[m^2]
-    double S_cable;//cable Emissive surface area[m^2]
-    double d_cable = 0.5e-3;//cable diameter
-    double l_cable = 20.e-3;//cable length[m]
-    double alpha_cable = 4.7e-3;//temp coefficient of resistivity [Ohm*m/K]
-    double rho_cable = 1.5e-8;//volume resistivity [Ohm*m]
-    double rhoMASS_cable = 8.96e3;//density [kg/m^3]
-    double SpecificHeat_cable = 385;//Specific Heat [J/kg*K]
     
     double omegafil;
-    double omegaSUS;
+    double omegaPin;
     double omegacable;
     double Breakvalue;
-    
     double Time_delta;
     double Time_Breakvalue;
     int timel_MAX;
     
     if(Mode == 1){
-        printf("Static Solver\n");
+        printf("Steady State\n");
         omegafil = 0.;
-        omegaSUS = 0.;
+        omegaPin = 0.;
         omegacable = 0.;
         timel_MAX=1;
         Breakvalue=1.e-6;
         Time_Breakvalue=0.;
     }else if(Mode == 2){
-        printf("Time Solver\n");
+        printf("Time evolution\n");
         omegafil = dz*dz*rhoMASS_fil*SpecificHeat_fil/dt/k_fil;
-        omegaSUS = dz*dz*rhoMASS_SUS*SpecificHeat_SUS/dt/k_SUS;
+        omegaPin = dz*dz*rhoMASS_Pin*SpecificHeat_Pin/dt/k_Pin;
         omegacable = dz*dz*rhoMASS_cable*SpecificHeat_cable/dt/k_cable;
         timel_MAX=1000;
         Breakvalue=1.e-6;
         Time_Breakvalue=1.e-6;
     }
     
-    A_cable = M_PI * d_cable * dz;
-    A_SUS = M_PI * d_SUS * dz;
-    A_fil = M_PI * d_fil * dz;
-    
-    S_cable = M_PI * (d_cable/2.) * (d_cable/2.);
-    S_SUS = M_PI * (d_SUS/2.) * (d_SUS/2.);
-    S_fil = M_PI * (d_fil/2.) * (d_fil/2.);
-    
-    double REcontact_SUS_fil;
-    double REcontact_cable_SUS;
-    
-    REcontact_SUS_fil = 0.12;//(REcontact_SUS_fil_circuit - 2.*rho_fil*l_fil/S_fil -2.*rho_SUS*l_SUS/S_SUS)/2.;
-    
-    REcontact_cable_SUS = 0.21;//(REcontact_cable_SUS_fil_circuit - REcontact_SUS_fil_circuit -2.*rho_cable*l_cable/S_cable)/2.;
-    printf("REcontact_cable_SUS %f\n", REcontact_cable_SUS);
-    printf("REcontact_SUS_fil %f\n", REcontact_SUS_fil);
-    
     int cable_ini;
     int cable_end;
-    int SUS_ini;
-    int SUS_end;
+    int Pin_ini;
+    int Pin_end;
     int fil_ini;
     int fil_end;
     int DIM;
     
     cable_ini=0;
     cable_end=(int)((l_cable)/dz);
-    SUS_ini=(int)((l_cable)/dz)+1;
-    SUS_end=(int)((l_cable+l_SUS)/dz)+1;
-    fil_ini=(int)((l_cable+l_SUS)/dz)+2;
-    fil_end=(int)((l_cable+l_SUS+l_fil)/dz)+2;
-    
+    Pin_ini=(int)((l_cable)/dz)+1;
+    Pin_end=(int)((l_cable+l_Pin)/dz)+1;
+    fil_ini=(int)((l_cable+l_Pin)/dz)+2;
+    fil_end=(int)((l_cable+l_Pin+l_half_fil)/dz)+2;
     DIM=fil_end+1;
     
     printf("Cable:  %d  to  %d\n",cable_ini, cable_end);
-    printf("SUS304:  %d  to  %d\n",SUS_ini, SUS_end);
+    printf("Pin304:  %d  to  %d\n",Pin_ini, Pin_end);
     printf("Filament:  %d  to  %d\n",fil_ini, fil_end);
     printf("Filament coating:  %d  to  %d\n",fil_end - (int)(coating_half_length/dz), fil_end);
     printf("DIM/all    %d \n",DIM);
@@ -186,17 +206,17 @@ int main()
     }
     
     
-    
     double DeltaTemperaturenorm=0.;
     
-    double RTcontact_cable_SUS;
-    double RTcontact_SUS_fil;
+    double RTcontact_cable_Pin;
+    double RTcontact_Pin_fil;
     
+    //Initial Temperature Condition
     for(i=cable_ini; i<=cable_end; i++){
         Temperature[i]=300.;
         Temperature_before[i]=300.;
     }
-    for(i=SUS_ini; i<=SUS_end; i++){
+    for(i=Pin_ini; i<=Pin_end; i++){
         Temperature[i]=300.;
         Temperature_before[i]=300.;
     }
@@ -222,7 +242,7 @@ int main()
     for(i = cable_ini; i <= cable_end; i++){
         fprintf(fp_time,"%f %f\n",i*dz*1e3,Temperature[i]);
     }
-    for(i = SUS_ini; i <= SUS_end; i++){
+    for(i = Pin_ini; i <= Pin_end; i++){
         fprintf(fp_time,"%f %f\n",(i-1)*dz*1e3,Temperature[i]);
     }
     for(i = fil_ini; i <= fil_end; i++){
@@ -231,7 +251,7 @@ int main()
     for(i = fil_end; i >= fil_ini; i--){
         fprintf(fp_time,"%f %f\n",(2.*fil_end-i-1)*dz*1e3,Temperature[i]);
     }
-    for(i = SUS_end; i >= SUS_ini; i--){
+    for(i = Pin_end; i >= Pin_ini; i--){
         fprintf(fp_time,"%f %f\n",(2.*fil_end-i-2)*dz*1e3,Temperature[i]);
     }
     for(i = cable_end; i >= cable_ini; i--){
@@ -254,12 +274,12 @@ int main()
         while(1){
             LOOPcount += 1;
             
-            RTcontact_cable_SUS = RTcontact(Temperature[cable_end], Temperature[SUS_ini], alpha_cable, alpha_SUS, k_cable, k_SUS, rho_cable, rho_SUS, REcontact_cable_SUS);
-            RTcontact_SUS_fil = RTcontact(Temperature[SUS_end], Temperature[fil_ini], alpha_SUS, alpha_fil, k_SUS, k_fil, rho_SUS, rho_fil, REcontact_SUS_fil);
+            RTcontact_cable_Pin = RTcontact(Temperature[cable_end], Temperature[Pin_ini], alpha_cable, alpha_Pin, k_cable, k_Pin, rho_cable, rho_Pin, REcontact_cable_Pin);
+            RTcontact_Pin_fil = RTcontact(Temperature[Pin_end], Temperature[fil_ini], alpha_Pin, alpha_fil, k_Pin, k_fil, rho_Pin, rho_fil, REcontact_Pin_fil);
             
             if(LOOPcount % displaycount == 0){
-                printf("RTcontact_cable_SUS %f\n", RTcontact_cable_SUS);
-                printf("RTcontact_SUS_fil %f\n", RTcontact_SUS_fil);
+                printf("RTcontact_cable_Pin %f\n", RTcontact_cable_Pin);
+                printf("RTcontact_Pin_fil %f\n", RTcontact_Pin_fil);
             }
             
             
@@ -274,7 +294,7 @@ int main()
                         }
                         if(j == 1){
                             A[i][j]= -2.-omegacable+dz*dz*
-                            functionF(Temperature[i], d_cable, e_cable, alpha_cable, rho_cable, k_cable);
+                            functionF(Temperature[i], d_cable, e_cable, alpha_cable, rho_cable, k_cable, Icur);
                         }
                         if(j == 2){
                             A[i][j]= 1.;
@@ -285,7 +305,7 @@ int main()
                         }
                         if(j == 1){
                             A[i][j]= -2.-omegacable+dz*dz*
-                            functionF(Temperature[i], d_cable, e_cable, alpha_cable, rho_cable, k_cable);
+                            functionF(Temperature[i], d_cable, e_cable, alpha_cable, rho_cable, k_cable, Icur);
                         }
                         if(j == 2){
                             A[i][j]=1.;
@@ -295,52 +315,52 @@ int main()
                             A[i][j]= k_cable*M_PI*(d_cable/2.)*(d_cable/2.)/dz;
                         }
                         if(j == 1){
-                            A[i][j]= -1./RTcontact_cable_SUS - k_cable*M_PI*(d_cable/2.)*(d_cable/2.)/dz;
+                            A[i][j]= -1./RTcontact_cable_Pin - k_cable*M_PI*(d_cable/2.)*(d_cable/2.)/dz;
                         }
                         if(j == 2){
-                            A[i][j]= 1./RTcontact_cable_SUS;
+                            A[i][j]= 1./RTcontact_cable_Pin;
                         }
                     }
                     
-                    else if(i == SUS_ini){
+                    else if(i == Pin_ini){
                         if(j == 0){
-                            A[i][j]= 1./RTcontact_cable_SUS;
+                            A[i][j]= 1./RTcontact_cable_Pin;
                         }
                         if(j == 1){
-                            A[i][j]= -1./RTcontact_cable_SUS - k_SUS*M_PI*(d_SUS/2.)*(d_SUS/2.)/dz;
+                            A[i][j]= -1./RTcontact_cable_Pin - k_Pin*M_PI*(d_Pin/2.)*(d_Pin/2.)/dz;
                         }
                         if(j == 2){
-                            A[i][j]= k_SUS*M_PI*(d_SUS/2.)*(d_SUS/2.)/dz;
+                            A[i][j]= k_Pin*M_PI*(d_Pin/2.)*(d_Pin/2.)/dz;
                         }
-                    } else if(SUS_ini < i && SUS_end > i){
+                    } else if(Pin_ini < i && Pin_end > i){
                         if(j == 0){
                             A[i][j]=1.;
                         }
                         if(j == 1){
-                            A[i][j]= -2.-omegaSUS+dz*dz*
-                            functionF(Temperature[i], d_SUS, e_SUS, alpha_SUS, rho_SUS, k_SUS);
+                            A[i][j]= -2.-omegaPin+dz*dz*
+                            functionF(Temperature[i], d_Pin, e_Pin, alpha_Pin, rho_Pin, k_Pin, Icur);
                         }
                         if(j == 2){
                             A[i][j]=1.;
                         }
-                    } else if(i == SUS_end){
+                    } else if(i == Pin_end){
                         if(j == 0){
-                            A[i][j]= k_SUS*M_PI*(d_SUS/2.)*(d_SUS/2.)/dz;
+                            A[i][j]= k_Pin*M_PI*(d_Pin/2.)*(d_Pin/2.)/dz;
                         }
                         if(j == 1){
-                            A[i][j]= -1./RTcontact_SUS_fil - k_SUS*M_PI*(d_SUS/2.)*(d_SUS/2.)/dz;
+                            A[i][j]= -1./RTcontact_Pin_fil - k_Pin*M_PI*(d_Pin/2.)*(d_Pin/2.)/dz;
                         }
                         if(j == 2){
-                            A[i][j]= 1./RTcontact_SUS_fil;
+                            A[i][j]= 1./RTcontact_Pin_fil;
                         }
                     }
                     
                     else if(i == fil_ini){
                         if(j == 0){
-                            A[i][j]= 1./RTcontact_SUS_fil;
+                            A[i][j]= 1./RTcontact_Pin_fil;
                         }
                         if(j == 1){
-                            A[i][j]= -1./RTcontact_SUS_fil - k_fil*M_PI*(d_fil/2.)*(d_fil/2.)/dz;
+                            A[i][j]= -1./RTcontact_Pin_fil - k_fil*M_PI*(d_fil/2.)*(d_fil/2.)/dz;
                         }
                         if(j == 2){
                             A[i][j]= k_fil*M_PI*(d_fil/2.)*(d_fil/2.)/dz;
@@ -352,7 +372,7 @@ int main()
                         }
                         if(j == 1){
                             A[i][j]= -2.-omegafil+dz*dz*
-                            functionF(Temperature[i], d_fil, e_fil, alpha_fil, rho_fil, k_fil);
+                            functionF(Temperature[i], d_fil, e_fil, alpha_fil, rho_fil, k_fil, Icur);
                         }
                         if(j == 2){
                             A[i][j]=1.;
@@ -364,7 +384,7 @@ int main()
                         }
                         if(j == 1){
                             A[i][j]= -1.-omegafil+dz*dz*
-                            functionF(Temperature[i], d_fil, e_fil, alpha_fil, rho_fil, k_fil);
+                            functionF(Temperature[i], d_fil, e_fil, alpha_fil, rho_fil, k_fil, Icur);
                         }
                         if(j == 2){
                             A[i][j]=0.;
@@ -376,27 +396,27 @@ int main()
             for(i = 0; i < DIM; i++){
                 
                 if(i == cable_ini){
-                    b[i]= -( (-2.-omegacable)*Temperature[i] + Temperature[i+1] + dz*dz*functionforiginal(Temperature[i], d_cable, e_cable, alpha_cable, rho_cable, k_cable)+300.+omegacable*Temperature_before[i]);
+                    b[i]= -( (-2.-omegacable)*Temperature[i] + Temperature[i+1] + dz*dz*functionforiginal(Temperature[i], d_cable, e_cable, alpha_cable, rho_cable, k_cable, Icur)+300.+omegacable*Temperature_before[i]);
                 } else if(cable_ini < i && cable_end > i){
-                    b[i]= -(Temperature[i-1] +(-2.-omegacable)*Temperature[i] + Temperature[i+1] + dz*dz*functionforiginal(Temperature[i], d_cable, e_cable, alpha_cable, rho_cable, k_cable) +omegacable*Temperature_before[i]);
+                    b[i]= -(Temperature[i-1] +(-2.-omegacable)*Temperature[i] + Temperature[i+1] + dz*dz*functionforiginal(Temperature[i], d_cable, e_cable, alpha_cable, rho_cable, k_cable, Icur) +omegacable*Temperature_before[i]);
                 } else if(i == cable_end){
-                    b[i]= -(Temperature[i-1]*k_cable*M_PI*(d_cable/2.)*(d_cable/2.)/dz -Temperature[i]/RTcontact_cable_SUS -Temperature[i]*k_cable*M_PI*(d_cable/2.)*(d_cable/2.)/dz +Temperature[i+1]/RTcontact_cable_SUS);
+                    b[i]= -(Temperature[i-1]*k_cable*M_PI*(d_cable/2.)*(d_cable/2.)/dz -Temperature[i]/RTcontact_cable_Pin -Temperature[i]*k_cable*M_PI*(d_cable/2.)*(d_cable/2.)/dz +Temperature[i+1]/RTcontact_cable_Pin);
                 }
                 
-                else if(i == SUS_ini){
-                    b[i]= -(Temperature[i-1]/RTcontact_cable_SUS -Temperature[i]/RTcontact_cable_SUS -Temperature[i]*k_SUS*M_PI*(d_SUS/2.)*(d_SUS/2.)/dz +Temperature[i+1]*k_SUS*M_PI*(d_SUS/2.)*(d_SUS/2.)/dz);
-                } else if(SUS_ini < i && SUS_end > i){
-                    b[i]= -(Temperature[i-1] +(-2.-omegaSUS)*Temperature[i] + Temperature[i+1] + dz*dz*functionforiginal(Temperature[i], d_SUS, e_SUS, alpha_SUS, rho_SUS, k_SUS)+omegaSUS*Temperature_before[i]);
-                } else if(i == SUS_end){
-                    b[i]= -(Temperature[i-1]*k_SUS*M_PI*(d_SUS/2.)*(d_SUS/2.)/dz -Temperature[i]/RTcontact_SUS_fil -Temperature[i]*k_SUS*M_PI*(d_SUS/2.)*(d_SUS/2.)/dz +Temperature[i+1]/RTcontact_SUS_fil);
+                else if(i == Pin_ini){
+                    b[i]= -(Temperature[i-1]/RTcontact_cable_Pin -Temperature[i]/RTcontact_cable_Pin -Temperature[i]*k_Pin*M_PI*(d_Pin/2.)*(d_Pin/2.)/dz +Temperature[i+1]*k_Pin*M_PI*(d_Pin/2.)*(d_Pin/2.)/dz);
+                } else if(Pin_ini < i && Pin_end > i){
+                    b[i]= -(Temperature[i-1] +(-2.-omegaPin)*Temperature[i] + Temperature[i+1] + dz*dz*functionforiginal(Temperature[i], d_Pin, e_Pin, alpha_Pin, rho_Pin, k_Pin, Icur)+omegaPin*Temperature_before[i]);
+                } else if(i == Pin_end){
+                    b[i]= -(Temperature[i-1]*k_Pin*M_PI*(d_Pin/2.)*(d_Pin/2.)/dz -Temperature[i]/RTcontact_Pin_fil -Temperature[i]*k_Pin*M_PI*(d_Pin/2.)*(d_Pin/2.)/dz +Temperature[i+1]/RTcontact_Pin_fil);
                 }
                 
                 else if(i == fil_ini){
-                    b[i]= -(Temperature[i-1]/RTcontact_SUS_fil -Temperature[i]/RTcontact_SUS_fil -Temperature[i]*k_fil*M_PI*(d_fil/2.)*(d_fil/2.)/dz +Temperature[i+1]*k_fil*M_PI*(d_fil/2.)*(d_fil/2.)/dz);
+                    b[i]= -(Temperature[i-1]/RTcontact_Pin_fil -Temperature[i]/RTcontact_Pin_fil -Temperature[i]*k_fil*M_PI*(d_fil/2.)*(d_fil/2.)/dz +Temperature[i+1]*k_fil*M_PI*(d_fil/2.)*(d_fil/2.)/dz);
                 } else if(fil_ini < i && fil_end > i){
-                    b[i]= -(Temperature[i-1] +(-2.-omegafil)*Temperature[i] + Temperature[i+1] + dz*dz*functionforiginal(Temperature[i], d_fil, e_fil, alpha_fil, rho_fil, k_fil)+omegafil*Temperature_before[i]);
+                    b[i]= -(Temperature[i-1] +(-2.-omegafil)*Temperature[i] + Temperature[i+1] + dz*dz*functionforiginal(Temperature[i], d_fil, e_fil, alpha_fil, rho_fil, k_fil, Icur)+omegafil*Temperature_before[i]);
                 } else if(i == fil_end){
-                    b[i]= -(Temperature[i-1] +(-1.-omegafil)*Temperature[i] + dz*dz*functionforiginal(Temperature[i], d_fil, e_fil, alpha_fil, rho_fil, k_fil) +omegafil*Temperature_before[i]);
+                    b[i]= -(Temperature[i-1] +(-1.-omegafil)*Temperature[i] + dz*dz*functionforiginal(Temperature[i], d_fil, e_fil, alpha_fil, rho_fil, k_fil, Icur) +omegafil*Temperature_before[i]);
                 }
             }
             //  -------------------------------------------------------
@@ -529,7 +549,7 @@ int main()
             for(i = cable_ini; i <= cable_end; i++){
                 fprintf(fp_time,"%f %f\n",i*dz*1e3,Temperature[i]);
             }
-            for(i = SUS_ini; i <= SUS_end; i++){
+            for(i = Pin_ini; i <= Pin_end; i++){
                 fprintf(fp_time,"%f %f\n",(i-1)*dz*1e3,Temperature[i]);
             }
             for(i = fil_ini; i <= fil_end; i++){
@@ -538,7 +558,7 @@ int main()
             for(i = fil_end; i >= fil_ini; i--){
                 fprintf(fp_time,"%f %f\n",(2.*fil_end-i-1)*dz*1e3,Temperature[i]);
             }
-            for(i = SUS_end; i >= SUS_ini; i--){
+            for(i = Pin_end; i >= Pin_ini; i--){
                 fprintf(fp_time,"%f %f\n",(2.*fil_end-i-2)*dz*1e3,Temperature[i]);
             }
             for(i = cable_end; i >= cable_ini; i--){
@@ -575,8 +595,8 @@ int main()
     
     
     for(i = 0; i < DIM; i++){
-        if(SUS_ini <= i && i <= SUS_end){
-            SUS_power += pow(Temperature[i],4.)*e_SUS*sigma*A_SUS;
+        if(Pin_ini <= i && i <= Pin_end){
+            Pin_power += pow(Temperature[i],4.)*e_Pin*sigma*A_Pin;
         }
         else if(fil_ini <= i && i <= fil_end){
             fil_power += pow(Temperature[i],4.)*e_fil*sigma*A_fil;
@@ -585,7 +605,7 @@ int main()
             cable_power += pow(Temperature[i],4.)*e_cable*sigma*A_cable;
         }
     }
-    totalpower = 2.*(SUS_power + fil_power + cable_power + (Temperature[0]-300.)*k_cable*M_PI*(d_cable/2.)*(d_cable/2.)/dz);
+    totalpower = 2.*(Pin_power + fil_power + cable_power + (Temperature[0]-300.)*k_cable*M_PI*(d_cable/2.)*(d_cable/2.)/dz);
     
     fprintf(GPLT,"set title font 'Arial,24'\n");
     fprintf(GPLT,"set tics font 'Arial,14'\n");
@@ -607,7 +627,7 @@ int main()
         fprintf(GPLT,"%f %f\n",i*dz*1e3,Temperature[i]);
         fprintf(fp,"%f %f\n",i*dz*1e3,Temperature[i]);
     }
-    for(i = SUS_ini; i <= SUS_end; i++){
+    for(i = Pin_ini; i <= Pin_end; i++){
         fprintf(GPLT,"%f %f\n",(i-1)*dz*1e3,Temperature[i]);
         fprintf(fp,"%f %f\n",(i-1)*dz*1e3,Temperature[i]);
     }
@@ -620,7 +640,7 @@ int main()
         fprintf(GPLT,"%f %f\n",(2.*fil_end-i-1)*dz*1e3,Temperature[i]);
         fprintf(fp,"%f %f\n",(2.*fil_end-i-1)*dz*1e3,Temperature[i]);
     }
-    for(i = SUS_end; i >= SUS_ini; i--){
+    for(i = Pin_end; i >= Pin_ini; i--){
         fprintf(GPLT,"%f %f\n",(2.*fil_end-i-2)*dz*1e3,Temperature[i]);
         fprintf(fp,"%f %f\n",(2.*fil_end-i-2)*dz*1e3,Temperature[i]);
     }
@@ -664,8 +684,8 @@ int main()
     for(i = 0; i < DIM; i++){
        if(fil_ini <= i && i <= fil_end){
            sumRI2 += dz * rho_fil * (1. + alpha_fil * (Temperature[i]-T0)) * Icur * Icur/(M_PI*d_fil/2.*d_fil/2.);
-       }else if (SUS_ini <= i && i <= SUS_end){
-           sumRI2 += dz * rho_SUS * (1. + alpha_SUS * (Temperature[i]-T0)) * Icur * Icur/(M_PI*d_SUS/2.*d_SUS/2.);
+       }else if (Pin_ini <= i && i <= Pin_end){
+           sumRI2 += dz * rho_Pin * (1. + alpha_Pin * (Temperature[i]-T0)) * Icur * Icur/(M_PI*d_Pin/2.*d_Pin/2.);
        }
        else if (cable_ini <= i && i <= cable_end){
            sumRI2 += dz * rho_cable * (1. + alpha_cable * (Temperature[i]-T0)) * Icur * Icur/(M_PI*d_cable/2.*d_cable/2.);
@@ -674,7 +694,7 @@ int main()
     
     
     printf("consumption TOTAL %1.2f[W]  RI^2 %1.2f[W]  Electronemission %1.2f[mA]\n",totalpower , sumRI2, totalcurrent*1e3);
-    printf("              fil %1.2f[W]  SUS %1.2f[W] cable %1.2f[W] cableTHR %1.2f[W]\n", 2.*fil_power, 2.*SUS_power, 2.*cable_power, 2.*(Temperature[0]-300.)*k_cable*M_PI*(d_cable/2.)*(d_cable/2.)/dz/*, filTHR %1.2f[W] 2.*(Temperature[DIM-1]-Temperature[DIM-2])*k_fil*M_PI*(d_fil/2.)*(d_fil/2.)/dz*/);
+    printf("              fil %1.2f[W]  Pin %1.2f[W] cable %1.2f[W] cableTHR %1.2f[W]\n", 2.*fil_power, 2.*Pin_power, 2.*cable_power, 2.*(Temperature[0]-300.)*k_cable*M_PI*(d_cable/2.)*(d_cable/2.)/dz/*, filTHR %1.2f[W] 2.*(Temperature[DIM-1]-Temperature[DIM-2])*k_fil*M_PI*(d_fil/2.)*(d_fil/2.)/dz*/);
     
     fclose(GPLT);
     fclose(fp);
@@ -683,22 +703,24 @@ int main()
 }
             
 
-double functionF(double T, double d, double e, double alpha, double rho, double k){
+
+
+double functionF(double T, double d, double e, double alpha, double rho, double k, double Current){
     double r;
     double Ans;
     
     r = d/2.;
-    Ans = 1./k *(alpha * rho * Icur * Icur/(M_PI*r*r)/(M_PI*r*r) - 8. * sigma * e * T*T*T / r );
+    Ans = 1./k *(alpha * rho * Current * Current/(M_PI*r*r)/(M_PI*r*r) - 8. * sigma * e * T*T*T / r );
     
     return Ans;
 }
 
-double functionforiginal(double T, double d, double e, double alpha, double rho, double k){
+double functionforiginal(double T, double d, double e, double alpha, double rho, double k, double Current){
     double r;
     double Ans;
     
     r = d/2.;
-    Ans = 1./k *(rho * (1. + alpha * (T-T0)) * Icur * Icur/(M_PI*r*r)/(M_PI*r*r) - 2. * sigma * e * (pow(T,4.) - pow(T0,4.))/ r );
+    Ans = 1./k *(rho * (1. + alpha * (T-T0)) * Current * Current/(M_PI*r*r)/(M_PI*r*r) - 2. * sigma * e * (pow(T,4.) - pow(T0,4.))/ r );
     
     return Ans;
 }
